@@ -99,7 +99,7 @@ def parse_product_info(html):
 
 
 def main():
-    url = input("Введіть URL товару на MediaExpert: ").strip()
+    url = "https://www.mediaexpert.pl/komputery-i-tablety/laptopy-i-ultrabooki/laptopy/laptop-asus-tuf-gaming-a16-fa607nu-r5161w-16-ips-144hz-r5-7535hs-16gb-ram-1tb-ssd-geforce-rtx4050-dlss-3-windows-11-home"
     html = get_html(url, RAW_PROXIES)
     if html:
         name, price, available = parse_product_info(html)
