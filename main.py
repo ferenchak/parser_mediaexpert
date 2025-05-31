@@ -1,7 +1,10 @@
-import requests
+from flask import Flask, request, jsonify
 from bs4 import BeautifulSoup
+import requests
 import random
 import time
+
+app = Flask(__name__)
 
 RAW_PROXIES = [
     "45.192.145.148:5490:pcnxbzdp:diry84e3teka",
@@ -57,58 +60,52 @@ RAW_PROXIES = [
 ]
 
 HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/113.0.0.0 Safari/537.36"
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
 }
-
 
 def format_proxy(proxy_str):
     ip, port, user, pwd = proxy_str.split(":")
     return {
         "http": f"http://{user}:{pwd}@{ip}:{port}",
-        "https": f"http://{user}:{pwd}@{ip}:{port}",
+        "https": f"http://{user}:{pwd}@{ip}:{port}"
     }
 
-
-def get_html(url, proxy_list):
-    for _ in range(len(proxy_list)):
-        proxy_str = random.choice(proxy_list)
-        proxies = format_proxy(proxy_str)
+def get_html(url):
+    for _ in range(len(RAW_PROXIES)):
+        proxy = random.choice(RAW_PROXIES)
+        proxies = format_proxy(proxy)
         try:
-            response = requests.get(url, headers=HEADERS, proxies=proxies, timeout=10)
-            if response.status_code == 200:
-                return response.text
-            else:
-                print(f"Status code {response.status_code} from {proxies['http']}")
-        except Exception as e:
-            print(f"Error with proxy {proxy_str}: {e}")
+            resp = requests.get(url, headers=HEADERS, proxies=proxies, timeout=10)
+            if resp.status_code == 200:
+                return resp.text
+        except:
             time.sleep(1)
     return None
 
-
 def parse_product_info(html):
     soup = BeautifulSoup(html, "html.parser")
-    name_tag = soup.find("meta", property="og:title")
-    price_tag = soup.find("meta", itemprop="price")
-    availability_tag = soup.find("meta", itemprop="availability")
+    name = soup.find("meta", property="og:title")
+    price = soup.find("meta", itemprop="price")
+    availability = soup.find("meta", itemprop="availability")
 
-    name = name_tag["content"] if name_tag else "N/A"
-    price = price_tag["content"] if price_tag else "N/A"
-    availability = "InStock" in availability_tag["content"] if availability_tag else False
+    return {
+        "name": name["content"] if name else None,
+        "price": price["content"] if price else None,
+        "availability": "InStock" in availability["content"] if availability else None
+    }
 
-    return name, price, availability
+@app.route("/parse")
+def parse():
+    url = request.args.get("url")
+    if not url:
+        return jsonify({"error": "Missing URL"}), 400
 
+    html = get_html(url)
+    if not html:
+        return jsonify({"error": "Failed to fetch page"}), 500
 
-def main():
-    url = "https://www.mediaexpert.pl/komputery-i-tablety/laptopy-i-ultrabooki/laptopy/laptop-asus-tuf-gaming-a16-fa607nu-r5161w-16-ips-144hz-r5-7535hs-16gb-ram-1tb-ssd-geforce-rtx4050-dlss-3-windows-11-home"
-    html = get_html(url, RAW_PROXIES)
-    if html:
-        name, price, available = parse_product_info(html)
-        print(f"Назва: {name}")
-        print(f"Ціна: {price}")
-        print(f"Наявність: {'Так' if available else 'Ні'}")
-    else:
-        print("Не вдалося отримати HTML сторінки.")
-
+    data = parse_product_info(html)
+    return jsonify(data)
 
 if __name__ == "__main__":
-    main()
+    app.run(host="0.0.0.0", port=10000)
