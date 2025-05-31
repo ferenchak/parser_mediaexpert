@@ -60,52 +60,64 @@ RAW_PROXIES = [
 ]
 
 HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
 }
 
 def format_proxy(proxy_str):
     ip, port, user, pwd = proxy_str.split(":")
     return {
         "http": f"http://{user}:{pwd}@{ip}:{port}",
-        "https": f"http://{user}:{pwd}@{ip}:{port}"
+        "https": f"http://{user}:{pwd}@{ip}:{port}",
     }
 
-def get_html(url):
-    for _ in range(len(RAW_PROXIES)):
-        proxy = random.choice(RAW_PROXIES)
-        proxies = format_proxy(proxy)
+def get_html(url, proxy_list):
+    for attempt in range(len(proxy_list)):
+        proxy_str = random.choice(proxy_list)
+        proxies = format_proxy(proxy_str)
         try:
-            resp = requests.get(url, headers=HEADERS, proxies=proxies, timeout=10)
-            if resp.status_code == 200:
-                return resp.text
-        except:
-            time.sleep(1)
+            print(f"[{attempt+1}] Trying proxy {proxy_str}")
+            response = requests.get(url, headers=HEADERS, proxies=proxies, timeout=5)
+            if response.status_code == 200 and "<html" in response.text.lower():
+                return response.text
+            else:
+                print(f"[{proxy_str}] Status: {response.status_code}")
+        except Exception as e:
+            print(f"[{proxy_str}] Error: {e}")
+        time.sleep(1)
     return None
 
 def parse_product_info(html):
-    soup = BeautifulSoup(html, "html.parser")
-    name = soup.find("meta", property="og:title")
-    price = soup.find("meta", itemprop="price")
-    availability = soup.find("meta", itemprop="availability")
+    try:
+        soup = BeautifulSoup(html, "html.parser")
+        name_tag = soup.find("meta", property="og:title")
+        price_tag = soup.find("meta", itemprop="price")
+        availability_tag = soup.find("meta", itemprop="availability")
 
-    return {
-        "name": name["content"] if name else None,
-        "price": price["content"] if price else None,
-        "availability": "InStock" in availability["content"] if availability else None
-    }
+        name = name_tag["content"] if name_tag else "N/A"
+        price = price_tag["content"] if price_tag else "N/A"
+        availability = "InStock" in availability_tag["content"] if availability_tag else False
+
+        return name, price, availability
+    except Exception as e:
+        print(f"[Parser Error] {e}")
+        return "N/A", "N/A", False
 
 @app.route("/parse")
 def parse():
     url = request.args.get("url")
     if not url:
-        return jsonify({"error": "Missing URL"}), 400
+        return jsonify({"error": "No URL provided"}), 400
 
-    html = get_html(url)
+    html = get_html(url, RAW_PROXIES)
     if not html:
-        return jsonify({"error": "Failed to fetch page"}), 500
+        return jsonify({"error": "Failed to retrieve HTML"}), 500
 
-    data = parse_product_info(html)
-    return jsonify(data)
+    name, price, available = parse_product_info(html)
+    return jsonify({
+        "name": name,
+        "price": price,
+        "availability": available
+    })
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=10000)
