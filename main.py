@@ -55,7 +55,6 @@ RAW_PROXIES = [
     "45.192.134.221:6542:pcnxbzdp:diry84e3teka",
     "216.173.79.194:6600:pcnxbzdp:diry84e3teka"
 ]
-]
 
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/113.0.0.0 Safari/537.36"
